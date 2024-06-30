@@ -1,4 +1,4 @@
-# ros2_nmpc
+# ros2_nmpc package
 
 A ROS 2 package implementing Nonlinear Model Predictive Control (NMPC) for differential drive robots using the Acados solver.
 

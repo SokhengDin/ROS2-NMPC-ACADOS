@@ -1,0 +1,15 @@
+nmpc_differential_drive:
+  ros__parameters:
+    lbx: [-10.0, -10.0, -3.14159]
+    ubx: [10.0, 10.0, 3.14159]
+    lbu: [-1.5, -1.5]
+    ubu: [1.5, 1.5]
+    Q_diag: [25.0, 10.0, 1.0]
+    R_diag: [0.1, 0.01]
+    R_rate_diag: [1.0, 2.0]
+    dt: 0.05
+    num_trajectory_points: 100
+    distance_threshold: 0.03
+    target_x: 3.0
+    target_y: 1.5
+    target_theta: 1.5708  # pi/2

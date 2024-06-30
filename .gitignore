@@ -1,0 +1,6 @@
+# ROS 2 C++ Project .gitignore
+
+# Build directories
+build/
+install/
+log/

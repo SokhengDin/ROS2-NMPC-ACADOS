@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
@@ -53,6 +54,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 add_library(${PROJECT_NAME}_lib
   src/nmpc_differential_drive.cpp
   src/acados_cpp_wrapper.cpp
+  src/ekf_differential_drive.cpp
   ${ACADOS_GENERATED_DIR}/acados_solver_differential_drive.c
 )
 
@@ -78,6 +80,7 @@ ament_target_dependencies(${PROJECT_NAME}_lib
 
 # Create the ROS 2 node executable
 add_executable(nmpc_differential_drive_node src/nmpc_differential_drive_node.cpp)
+add_executable(ekf_differential_drive_node src/ekf_differential_drive_node.cpp)
 
 # Link the node executable with the project library
 target_link_libraries(nmpc_differential_drive_node
@@ -87,6 +90,7 @@ target_link_libraries(nmpc_differential_drive_node
 # Add dependencies for the custom messages
 rosidl_target_interfaces(nmpc_differential_drive_node
   ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 
 # Add ROS 2 dependencies to the node
 ament_target_dependencies(nmpc_differential_drive_node 
@@ -98,6 +102,16 @@ ament_target_dependencies(nmpc_differential_drive_node
   tf2_geometry_msgs
 )
 
+ament_target_dependencies(ekf_differential_drive_node 
+  rclcpp 
+  geometry_msgs 
+  nav_msgs 
+  tf2 
+  tf2_ros
+  tf2_geometry_msgs
+  sensor_msgs
+)
+
 # Set RPATH for the executable
 set_target_properties(nmpc_differential_drive_node PROPERTIES
   INSTALL_RPATH "$ORIGIN:${CMAKE_INSTALL_PREFIX}/lib:${ACADOS_INSTALL_DIR}/lib:${ACADOS_GENERATED_DIR}"
@@ -107,6 +121,7 @@ set_target_properties(nmpc_differential_drive_node PROPERTIES
 # Install targets
 install(TARGETS
   nmpc_differential_drive_node
+  ekf_differential_drive_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

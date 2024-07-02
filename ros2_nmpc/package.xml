@@ -17,6 +17,7 @@
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
   <depend>std_srvs</depend>
+  <depend>sensor_msgs</depend>
 
   <exec_depend>rosidl_default_runtime</exec_depend>
   <member_of_group>rosidl_interface_packages</member_of_group>

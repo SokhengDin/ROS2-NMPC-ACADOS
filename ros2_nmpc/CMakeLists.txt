@@ -6,7 +6,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Find required packages
-find_package(Python3 REQUIRED COMPONENTS Interpreter Development NumPy)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -15,9 +14,7 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
-
-# Link file system library
-link_libraries(stdc++fs)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development NumPy)
 
 # Set Acados path
 set(ACADOS_INSTALL_DIR "/home/eroxii/ocp_ws/acados" CACHE PATH "Path to acados installation")
@@ -44,14 +41,12 @@ set(ACADOS_SOLVER_LIB "${ACADOS_GENERATED_DIR}/libacados_ocp_solver_differential
 if(NOT EXISTS ${ACADOS_SOLVER_LIB})
   message(FATAL_ERROR "Acados solver library not found at ${ACADOS_SOLVER_LIB}. 
   Make sure to generate it before building by running your Acados model generation script.")
-else()
-  # Copy Acados solver library to build directory
-  file(COPY ${ACADOS_SOLVER_LIB} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
 # Create Service
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SetTarget.srv"
+  DEPENDENCIES std_msgs geometry_msgs
 )
 
 # Create the project library
@@ -66,7 +61,7 @@ target_link_libraries(${PROJECT_NAME}_lib
   ${ACADOS_INSTALL_DIR}/lib/libacados.so
   ${ACADOS_INSTALL_DIR}/lib/libblasfeo.so
   ${ACADOS_INSTALL_DIR}/lib/libhpipm.so
-  ${CMAKE_CURRENT_BINARY_DIR}/libacados_ocp_solver_differential_drive.so
+  ${ACADOS_SOLVER_LIB}
   ${Python3_LIBRARIES}
   ${Python3_NumPy_LIBRARIES}
 )
@@ -84,15 +79,16 @@ ament_target_dependencies(${PROJECT_NAME}_lib
 # Create the ROS 2 node executable
 add_executable(nmpc_differential_drive_node src/nmpc_differential_drive_node.cpp)
 
+# Link the node executable with the project library
 target_link_libraries(nmpc_differential_drive_node
   ${PROJECT_NAME}_lib
 )
 
-rosidl_get_typesupport_target(cpp_typesupport_target
-  ${PROJECT_NAME} rosidl_typesupport_cpp)
+# Add dependencies for the custom messages
+rosidl_target_interfaces(nmpc_differential_drive_node
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-target_link_libraries(nmpc_differential_drive_node "${cpp_typesupport_target}")
-
+# Add ROS 2 dependencies to the node
 ament_target_dependencies(nmpc_differential_drive_node 
   rclcpp 
   geometry_msgs 
@@ -104,7 +100,7 @@ ament_target_dependencies(nmpc_differential_drive_node
 
 # Set RPATH for the executable
 set_target_properties(nmpc_differential_drive_node PROPERTIES
-  INSTALL_RPATH "${CMAKE_CURRENT_BINARY_DIR}:${ACADOS_INSTALL_DIR}/lib"
+  INSTALL_RPATH "$ORIGIN:${CMAKE_INSTALL_PREFIX}/lib:${ACADOS_INSTALL_DIR}/lib:${ACADOS_GENERATED_DIR}"
   BUILD_WITH_INSTALL_RPATH TRUE
 )
 
@@ -119,6 +115,11 @@ install(TARGETS ${PROJECT_NAME}_lib
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
+)
+
+# Install the Acados solver library
+install(FILES ${ACADOS_SOLVER_LIB}
+  DESTINATION lib
 )
 
 # Install header files

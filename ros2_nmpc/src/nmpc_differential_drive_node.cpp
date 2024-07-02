@@ -1,5 +1,6 @@
 #include "rclcpp/rclcpp.hpp"
 #include "ros2_nmpc/nmpc_differential_drive.hpp"
+#include "ros2_nmpc/srv/set_target.hpp"
 #include <vector>
 
 class NMPCDifferentialDriveNode : public rclcpp::Node
@@ -18,6 +19,9 @@ class NMPCDifferentialDriveNode : public rclcpp::Node
             this->declare_parameter("dt", 0.1);
             this->declare_parameter("num_trajectory_points", 20);
             this->declare_parameter("distance_threshold", 0.1);
+            this->declare_parameter("target_x", 0.0);
+            this->declare_parameter("target_y", 0.0);
+            this->declare_parameter("target_theta", 0.0);
 
             ros2_nmpc::NMPCDifferentialDrive::NMPCParams params;
             params.lbx = this->get_parameter("lbx").as_double_array();
@@ -35,7 +39,7 @@ class NMPCDifferentialDriveNode : public rclcpp::Node
             controller_ = std::make_unique<ros2_nmpc::NMPCDifferentialDrive>("nmpc_controller", params);
 
             // Create a service to set the target
-            set_target_service_ = this->create_service<example_interfaces::srv::SetTarget>(
+            set_target_service_ = this->create_service<ros2_nmpc::srv::SetTarget>(
                 "set_target",
                 std::bind(&NMPCDifferentialDriveNode::set_target_callback, this, std::placeholders::_1, std::placeholders::_2));
 
@@ -44,28 +48,32 @@ class NMPCDifferentialDriveNode : public rclcpp::Node
 
     private:
         void set_target_callback(
-            const std::shared_ptr<example_interfaces::srv::SetTarget::Request> request,
-            std::shared_ptr<example_interfaces::srv::SetTarget::Response> response)
+            const std::shared_ptr<ros2_nmpc::srv::SetTarget::Request> request,
+            std::shared_ptr<ros2_nmpc::srv::SetTarget::Response> response)
         {
             if (request->target.size() != 3) {
                 RCLCPP_ERROR(this->get_logger(), "Invalid target size. Expected 3 (x, y, theta), got %zu", request->target.size());
                 response->success = false;
+                response->message = "Invalid target size";
                 return;
             }
 
             try {
-                controller_->setTarget(request->target);
+                std::vector<double> target_vector(request->target.begin(), request->target.end());
+                controller_->setTarget(target_vector);
                 RCLCPP_INFO(this->get_logger(), "New target set: x=%f, y=%f, theta=%f",
                             request->target[0], request->target[1], request->target[2]);
                 response->success = true;
+                response->message = "Target set successfully";
             } catch (const std::exception& e) {
                 RCLCPP_ERROR(this->get_logger(), "Failed to set target: %s", e.what());
                 response->success = false;
+                response->message = "Failed to set target: " + std::string(e.what());
             }
         }
 
         std::unique_ptr<ros2_nmpc::NMPCDifferentialDrive> controller_;
-        rclcpp::Service<example_interfaces::srv::SetTarget>::SharedPtr set_target_service_;
+        rclcpp::Service<ros2_nmpc::srv::SetTarget>::SharedPtr set_target_service_;
 };
 
 int main(int argc, char** argv)

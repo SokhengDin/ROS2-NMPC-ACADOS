@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Find required packages
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development NumPy)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -13,7 +14,7 @@ find_package(nav_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
-find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 
 # Link file system library
 link_libraries(stdc++fs)
@@ -48,15 +49,20 @@ else()
   file(COPY ${ACADOS_SOLVER_LIB} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
+# Create Service
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/SetTarget.srv"
+)
+
 # Create the project library
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME}_lib
   src/nmpc_differential_drive.cpp
   src/acados_cpp_wrapper.cpp
   ${ACADOS_GENERATED_DIR}/acados_solver_differential_drive.c
 )
 
 # Link the project library with Acados and other dependencies
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(${PROJECT_NAME}_lib
   ${ACADOS_INSTALL_DIR}/lib/libacados.so
   ${ACADOS_INSTALL_DIR}/lib/libblasfeo.so
   ${ACADOS_INSTALL_DIR}/lib/libhpipm.so
@@ -66,7 +72,7 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 # Add ROS 2 dependencies to the library
-ament_target_dependencies(${PROJECT_NAME}
+ament_target_dependencies(${PROJECT_NAME}_lib
   rclcpp
   geometry_msgs
   nav_msgs
@@ -77,9 +83,16 @@ ament_target_dependencies(${PROJECT_NAME}
 
 # Create the ROS 2 node executable
 add_executable(nmpc_differential_drive_node src/nmpc_differential_drive_node.cpp)
+
 target_link_libraries(nmpc_differential_drive_node
-  ${PROJECT_NAME}
+  ${PROJECT_NAME}_lib
 )
+
+rosidl_get_typesupport_target(cpp_typesupport_target
+  ${PROJECT_NAME} rosidl_typesupport_cpp)
+
+target_link_libraries(nmpc_differential_drive_node "${cpp_typesupport_target}")
+
 ament_target_dependencies(nmpc_differential_drive_node 
   rclcpp 
   geometry_msgs 
@@ -102,7 +115,7 @@ install(TARGETS
 )
 
 # Install the library
-install(TARGETS ${PROJECT_NAME}
+install(TARGETS ${PROJECT_NAME}_lib
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin

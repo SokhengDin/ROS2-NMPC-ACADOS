@@ -1,6 +1,7 @@
 #include "ros2_nmpc/nmpc_differential_drive.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "acados_solver_differential_drive.h"
 #include <cmath>
 #include <stdexcept>
 #include <iostream>
@@ -67,8 +68,11 @@ namespace ros2_nmpc {
         }
 
         try {
-            setInitialState(x_curr_);
+            // Set initial state
+            ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "lbx", x_curr_.data());
+            ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "ubx", x_curr_.data());
 
+            // Set references
             for (int j = 0; j <= DIFFERENTIAL_DRIVE_N; ++j) {
                 int ref_index = std::min(iteration_ + j, static_cast<int>(x_ref_traj_.size()) - 1);
                 std::vector<double> yref(DIFFERENTIAL_DRIVE_NY, 0.0);
@@ -82,16 +86,20 @@ namespace ros2_nmpc {
                     }
                 }
                 
-                setReference(j, yref);
+                ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, j, "yref", yref.data());
             }
 
-            int status = solve();
+            // Solve
+            int status = differential_drive_acados_solve(capsule);
             if (status != 0) {
                 throw std::runtime_error("Solver failed with status " + std::to_string(status));
             }
 
-            std::vector<double> u = getControl(0);
+            // Get control
+            std::vector<double> u(DIFFERENTIAL_DRIVE_NU);
+            ocp_nlp_out_get(nlp_config, nlp_dims, nlp_out, 0, "u", u.data());
 
+            // Publish control
             auto cmd_vel_msg = geometry_msgs::msg::Twist();
             cmd_vel_msg.linear.x = u[0];
             cmd_vel_msg.angular.z = u[1];
@@ -99,6 +107,7 @@ namespace ros2_nmpc {
 
             RCLCPP_INFO(this->get_logger(), "Published velocity command: linear = %f, angular = %f", u[0], u[1]);
 
+            // Check if target reached
             double distance = std::sqrt(std::pow(x_curr_[0] - x_target_[0], 2) + 
                                         std::pow(x_curr_[1] - x_target_[1], 2) +
                                         std::pow(x_curr_[2] - x_target_[2], 2));
@@ -206,43 +215,18 @@ namespace ros2_nmpc {
         ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, DIFFERENTIAL_DRIVE_N, "W", W_e.data());
     }
 
-    int NMPCDifferentialDrive::solve()
-    {
-        return differential_drive_acados_solve(capsule);
-    }
-
-    void NMPCDifferentialDrive::setInitialState(const std::vector<double>& x0)
-    {
-        differential_drive_acados_set_initialx(capsule, x0.data());
-    }
-
-    void NMPCDifferentialDrive::setReference(int stage, const std::vector<double>& yref)
-    {
-        differential_drive_acados_set_reference(capsule, stage, yref.data());
-    }
-
-    std::vector<double> NMPCDifferentialDrive::getState(int stage)
-    {
-        std::vector<double> state(DIFFERENTIAL_DRIVE_NX);
-        differential_drive_acados_get_state(capsule, stage, state.data());
-        return state;
-    }
-
-    std::vector<double> NMPCDifferentialDrive::getControl(int stage)
-    {
-        std::vector<double> control(DIFFERENTIAL_DRIVE_NU);
-        differential_drive_acados_get_control(capsule, stage, control.data());
-        return control;
-    }
-
     double NMPCDifferentialDrive::getSolveTime()
     {
-        return differential_drive_acados_get_solve_time(capsule);
-    }
+        double solve_time;
+        ocp_nlp_get(nlp_config, nlp_solver, "time_tot", &solve_time);
+        return solve_time;
+    }   
 
     int NMPCDifferentialDrive::getSQPIterations()
     {
-        return differential_drive_acados_get_sqp_iterations(capsule);
+        int sqp_iter;
+        ocp_nlp_get(nlp_config, nlp_solver, "sqp_iter", &sqp_iter);
+        return sqp_iter;
     }
 
     void NMPCDifferentialDrive::printSolverInfo()

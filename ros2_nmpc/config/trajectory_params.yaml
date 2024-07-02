@@ -1,0 +1,10 @@
+trajectory_node:
+  ros__parameters:
+    trajectory_type: "cubic"
+    num_points: 100
+    start_point: [0.0, 0.0, 0.0]
+    end_point: [5.0, 5.0, 3.14159]
+    control_points: [[0.0, 0.0, 0.0], [2.5, 2.5, 1.57], [5.0, 5.0, 3.14159]]
+    duration: 10.0
+    publish_frequency: 10.0
+    trajectory_topic: "/trajectory"
